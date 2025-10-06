@@ -8,4 +8,8 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  cors: {
+    origin: ["http://localhost:3000", "https://opart-mocha.vercel.app"],
+    credentials: true,
+  },
 });
