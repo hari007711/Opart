@@ -1,5 +1,5 @@
 // app/api/auth/[...betterauth]/route.ts
 import { auth } from "@/lib/auth";
-import { betterAuthHandler } from "better-auth/next-js";
+import { toNextJsHandler } from "better-auth/next-js";
 
-export const { GET, POST } = betterAuthHandler(auth);
+export const { GET, POST } = toNextJsHandler(auth);
