@@ -6,11 +6,5 @@ export const auth = betterAuth({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
   }),
-  emailAndPassword: {
-    enabled: true,
-  },
-  cors: {
-    origin: ["http://localhost:3000", "https://opart-mocha.vercel.app"],
-    credentials: true,
-  },
+  emailAndPassword: { enabled: true },
 });
