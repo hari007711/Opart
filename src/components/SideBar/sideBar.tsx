@@ -1,4 +1,5 @@
 import { useStep } from "@/contexts/stepContext";
+import { useAuth } from "@/components/AuthProvider";
 import Icon from "@/assets/logo/logo";
 import PrepImmediate from "@/assets/icons/prepImmediate";
 import PrepBatch1Hr from "@/assets/icons/prep-batch-1hr";
@@ -7,8 +8,10 @@ import PrepBatch24Hr from "@/assets/icons/prep-batch-24";
 import AdminForecast from "@/assets/icons/icon-admin-forecast";
 import AdminStockOrder from "@/assets/icons/icon-admin-stock-order";
 import AdminStockCount from "@/assets/icons/icon-admin-stock-count";
+
 export default function RestaurantSidebar() {
   const { currentStep, setCurrentStep } = useStep();
+  const { user, signOut } = useAuth();
 
   return (
     <div className="w-18 bg-neutral-black text-white flex flex-col items-center">
@@ -122,6 +125,21 @@ export default function RestaurantSidebar() {
           </div>
         </ul>
       </nav>
+
+      {/* User info and logout */}
+      <div className="mt-auto p-4 w-full">
+        <div className="text-center mb-2">
+          <p className="text-xs text-gray-300 truncate" title={user?.name}>
+            {user?.name || "User"}
+          </p>
+        </div>
+        <button
+          onClick={signOut}
+          className="w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 px-3 rounded transition-colors"
+        >
+          Logout
+        </button>
+      </div>
     </div>
   );
 }

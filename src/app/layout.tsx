@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 // import { Geist, Geist_Mono } from "next/font/google";
 import { Inter } from "next/font/google";
 import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "@/components/AuthProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable}  antialiased`}>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
         <Toaster
           position="top-center"
           toastOptions={{
