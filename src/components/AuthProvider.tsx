@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,31 +17,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
-      try {
-        const session = await authClient.getSession();
-        setUser(session.data?.user || null);
-      } catch (error) {
-        console.error("Error getting session:", error);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getSession();
-
-    // Listen for auth state changes
-    const unsubscribe = authClient.onSessionChange((session) => {
+  const refreshUser = async () => {
+    try {
+      const session = await authClient.getSession();
       setUser(session.data?.user || null);
+    } catch (error) {
+      console.error("Error getting session:", error);
+      setUser(null);
+    } finally {
       setLoading(false);
-    });
+    }
+  };
 
-    return () => {
-      unsubscribe();
-    };
+  useEffect(() => {
+    refreshUser();
   }, []);
 
   const signOut = async () => {
@@ -53,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -14,7 +14,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   // Redirect if already logged in
   if (user) {
@@ -48,6 +48,7 @@ export default function RegisterPage() {
         toast.error(result.error.message || "Sign up failed");
       } else {
         toast.success("Account created successfully!");
+        await refreshUser(); // Refresh user state
         router.push("/"); // Redirect to dashboard
       }
     } catch (err) {

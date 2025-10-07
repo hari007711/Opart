@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   // Redirect if already logged in
   if (user) {
@@ -34,6 +34,7 @@ export default function LoginPage() {
         toast.error(result.error.message || "Sign in failed");
       } else {
         toast.success("Sign in successful!");
+        await refreshUser(); // Refresh user state
         router.push("/");
       }
     } catch (err) {
