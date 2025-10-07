@@ -146,7 +146,6 @@ export default function ImmediatePrepItems() {
     fetchForecasts();
   }, []);
 
-  console.log(offCycleItems, "offCycleItems");
 
   if (loading) {
     return (

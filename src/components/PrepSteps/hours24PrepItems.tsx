@@ -54,7 +54,6 @@ export default function Hours24PrepItems() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { refreshKey } = useRefreshStore();
-  console.log(refreshKey, "key");
 
   useEffect(() => {
     const fetchForecasts = async () => {

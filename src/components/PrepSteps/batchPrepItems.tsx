@@ -98,8 +98,6 @@ export default function BatchPrepItems() {
     fetchForecasts();
   }, [refreshKey]);
 
-  console.log(refreshKey, "key");
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full p-6">

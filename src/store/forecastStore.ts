@@ -106,7 +106,6 @@ export const useForecastStore = create<ForecastState>((set, get) => ({
         }
       );
       toast.success("Approved successfully");
-      console.log(res);
 
       set((state) => ({ refreshTrigger: state.refreshTrigger + 1 }));
     } catch (err) {

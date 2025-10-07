@@ -1447,7 +1447,6 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
 
   const duration = 3;
   // const duration = prepIntervalHours * 60 * 60;
-  console.log(prepIntervalHours);
 
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
@@ -1611,7 +1610,6 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
         updatedBy,
       };
       const response = await api.OnHand(payload, ingredientPrepForecastId);
-      console.log("Update successful:", response);
       triggerRefresh();
 
       return response;
@@ -1627,7 +1625,6 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
         updatedBy,
       };
       const response = await api.OnExpired(payload, ingredientPrepForecastId);
-      console.log("Update successful:", response);
       triggerRefresh();
 
       return response;
@@ -1645,7 +1642,6 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
   const DeleteExpiredApi = async () => {
     try {
       const response = await api.DeleteExpired(ingredientPrepForecastId);
-      console.log("Update successful:", response);
       return response;
     } catch (error) {
       console.error("Error updating preparation status:", error);
@@ -1674,8 +1670,6 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
       // setLoading(false);
     }
   };
-
-  console.log(ingredientData, "ingreee");
 
   return (
     <Drawer

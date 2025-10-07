@@ -11,7 +11,7 @@ import AdminStockCount from "@/assets/icons/icon-admin-stock-count";
 
 export default function RestaurantSidebar() {
   const { currentStep, setCurrentStep } = useStep();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div className="w-18 bg-neutral-black text-white flex flex-col items-center">
@@ -133,12 +133,6 @@ export default function RestaurantSidebar() {
             {user?.name || "User"}
           </p>
         </div>
-        <button
-          onClick={signOut}
-          className="w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 px-3 rounded transition-colors"
-        >
-          Logout
-        </button>
       </div>
     </div>
   );

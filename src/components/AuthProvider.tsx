@@ -7,7 +7,6 @@ import type { User } from "better-auth/types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -33,17 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, []);
 
-  const signOut = async () => {
-    try {
-      await authClient.signOut();
-      setUser(null);
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

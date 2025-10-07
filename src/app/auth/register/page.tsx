@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
@@ -16,9 +16,14 @@ export default function RegisterPage() {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
 
-  // Redirect if already logged in
+  // Redirect after mount to avoid updating Router during render
+  useEffect(() => {
+    if (user) {
+      router.replace("/");
+    }
+  }, [user, router]);
+
   if (user) {
-    router.push("/");
     return null;
   }
 

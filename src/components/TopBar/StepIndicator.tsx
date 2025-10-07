@@ -39,8 +39,6 @@ export default function StepIndicator() {
   const { forecastState, setForecastState } = useForecastStatusStore();
   const [activeTab, setActiveTab] = useState("Overall");
 
-  console.log(currentStepData, "activeTab");
-
   // useEffect(() => {
   //   if (currentStepData.name != "Today's Forecast") {
   //     setForecastState("modify");

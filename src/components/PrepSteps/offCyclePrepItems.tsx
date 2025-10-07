@@ -60,7 +60,6 @@ export default function OffCyclePrepItems() {
         const allIngredients = response.forecasts.flatMap(
           (forecast: DayPartForecast) => forecast.ingredients
         );
-        console.log(allIngredients.length);
 
         const offCycle: OffCycleItem[] = allIngredients
           .filter(
