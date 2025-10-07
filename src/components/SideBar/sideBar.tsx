@@ -127,13 +127,13 @@ export default function RestaurantSidebar() {
       </nav>
 
       {/* User info and logout */}
-      <div className="mt-auto p-4 w-full">
+      {/* <div className="mt-auto p-4 w-full">
         <div className="text-center mb-2">
           <p className="text-xs text-gray-300 truncate" title={user?.name}>
             {user?.name || "User"}
           </p>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
