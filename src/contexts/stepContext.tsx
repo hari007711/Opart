@@ -25,6 +25,8 @@ export function StepProvider({ children }: { children: ReactNode }) {
     { id: 4, name: "Today's Forecast" },
     { id: 5, name: "Inventory Count" },
     { id: 6, name: "Inventory Order" },
+    { id: 7, name: "Print Labels" },
+    { id: 8, name: "Search" },
   ];
 
   return (

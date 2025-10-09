@@ -25,6 +25,7 @@ interface ForecasttemCardProps {
   image?: StaticImageData;
   itemId?: string;
   day?: string;
+  imageUrl?: string;
 }
 
 type QuantitiesState = Record<string, number>;

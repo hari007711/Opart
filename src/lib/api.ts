@@ -204,4 +204,62 @@ export const api = {
 
     return result || [];
   },
+
+  WeeklyInventoryCnt: async (
+    startDate: string,
+    endDate: string,
+    storageLocation?: string,
+    category?: string
+  ) => {
+    console.log("WeeklyInventoryCnt called with:", {
+      startDate,
+      endDate,
+      storageLocation,
+      category,
+    });
+
+    const params = new URLSearchParams();
+    params.append("startDate", startDate);
+    params.append("endDate", endDate);
+
+    if (storageLocation && storageLocation.trim() !== "") {
+      params.append("storageLocation", storageLocation);
+      console.log("Adding storageLocation to API call:", storageLocation);
+    }
+
+    if (category && category.trim() !== "") {
+      params.append("category", category);
+      console.log("Adding category to API call:", category);
+    }
+
+    const apiUrl = `${BASE_URL}/stock-counting/weekly?${params.toString()}`;
+    console.log("Final API URL:", apiUrl);
+    console.log("Query params:", params.toString());
+
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch weekly inventory: ${response.statusText}`
+      );
+    }
+    const result = await response.json();
+
+    return result || [];
+  },
+
+  InventoryOrder: async () => {
+    const response = await fetch(`${BASE_URL}/inventory/stock-order`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch users: ${response.statusText}`);
+    }
+    const result = await response.json();
+
+    return result || [];
+  },
 };

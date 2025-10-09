@@ -106,6 +106,7 @@ export const useForecastStore = create<ForecastState>((set, get) => ({
         }
       );
       toast.success("Approved successfully");
+      console.log(res);
 
       set((state) => ({ refreshTrigger: state.refreshTrigger + 1 }));
     } catch (err) {
@@ -127,4 +128,129 @@ interface RefreshStore {
 export const useRefreshStore = create<RefreshStore>((set) => ({
   refreshKey: 0,
   triggerRefresh: () => set((state) => ({ refreshKey: state.refreshKey + 1 })),
+}));
+
+interface QuantityData {
+  boxes: number;
+  bags: number;
+  each: number;
+}
+
+interface PendingUpdateValue {
+  remainingQuantity: QuantityData;
+  updatedBy: string;
+}
+
+interface InventoryStore {
+  pendingUpdates: Map<string, PendingUpdateValue>;
+  addPendingUpdate: (
+    ingredientId: string,
+    quantity: QuantityData,
+    updatedBy: string
+  ) => void;
+  clearPendingUpdates: () => void;
+  saveAllUpdates: () => Promise<void>;
+  isSaving: boolean;
+}
+
+export const useInventoryStore = create<InventoryStore>((set, get) => ({
+  pendingUpdates: new Map(),
+  isSaving: false,
+
+  addPendingUpdate: (
+    ingredientId: string,
+    quantity: QuantityData,
+    updatedBy: string
+  ) => {
+    set((state) => {
+      const newUpdates = new Map(state.pendingUpdates);
+      newUpdates.set(ingredientId, {
+        remainingQuantity: quantity,
+        updatedBy: updatedBy,
+      });
+
+      return { pendingUpdates: newUpdates };
+    });
+  },
+
+  saveAllUpdates: async () => {
+    const { pendingUpdates } = get();
+
+    if (pendingUpdates.size === 0) {
+      console.log("No updates to save");
+      return;
+    }
+
+    set({ isSaving: true });
+
+    try {
+      const updatePromises = Array.from(pendingUpdates.entries()).map(
+        ([ingredientId, updateData]) => {
+          const { remainingQuantity, updatedBy } = updateData;
+
+          return fetch(
+            `https://qb4rj4gqfe.execute-api.us-east-1.amazonaws.com/prod/stock-counting/${ingredientId}/quantity`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                remainingQuantity: remainingQuantity,
+                updatedBy: updatedBy,
+                notes: "Physical count updated",
+              }),
+            }
+          ).then((response) => {
+            if (!response.ok) {
+              throw new Error(`Failed to update ${ingredientId}`);
+            }
+            return response.json();
+          });
+        }
+      );
+
+      await Promise.all(updatePromises);
+      get().clearPendingUpdates();
+    } catch (error) {
+      console.error("Error saving updates:", error);
+      throw error;
+    } finally {
+      set({ isSaving: false });
+    }
+  },
+
+  clearPendingUpdates: () => {
+    set({ pendingUpdates: new Map() });
+  },
+}));
+
+interface SearchState {
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+}
+
+export const useSearchStore = create<SearchState>((set) => ({
+  searchTerm: "",
+  setSearchTerm: (value) => set({ searchTerm: value }),
+}));
+
+interface PrintLabelState {
+  selectedItemsCount: number;
+  setSelectedItemsCount: (count: number) => void;
+}
+
+export const usePrintLabelStore = create<PrintLabelState>((set) => ({
+  selectedItemsCount: 0,
+  setSelectedItemsCount: (count) => set({ selectedItemsCount: count }),
+}));
+
+interface LocationState {
+  selectedLocation: string;
+  setSelectedLocation: (location: string) => void;
+}
+
+export const useLocationStore = create<LocationState>((set) => ({
+  selectedLocation: "",
+  setSelectedLocation: (location) => set({ selectedLocation: location }),
 }));

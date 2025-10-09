@@ -146,7 +146,6 @@ export default function ImmediatePrepItems() {
     fetchForecasts();
   }, []);
 
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full p-6">

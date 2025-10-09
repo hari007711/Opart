@@ -1514,13 +1514,6 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
   const { strokeDasharray, strokeDashoffset } =
     createCircularProgress(progressPercentage);
 
-  const [updatedBy, setUpdatedBy] = useState<string>("");
-
-  useEffect(() => {
-    const name = localStorage.getItem("userName");
-    setUpdatedBy(name!);
-  }, []);
-
   // const PreparationStatus = async (
   //   ingredientPrepForecastId: string,
   //   updatedBy: string
@@ -1597,19 +1590,26 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
     [triggerRefresh]
   );
 
+  const [updatedBy, setUpdatedBy] = useState("");
+
+  useEffect(() => {
+    const name = localStorage.getItem("userName");
+    setUpdatedBy(name!);
+  }, []);
+
   useEffect(() => {
     if (timeLeft === 0) {
       PreparationStatus(ingredientPrepForecastId, updatedBy);
     }
   }, [timeLeft, PreparationStatus, ingredientPrepForecastId, updatedBy]);
 
-  const OnHandAPi = async (ingredientPrepForecastId: string) => {
+  const OnHandAPi = async (ingredientId: string) => {
     try {
       const payload = {
         onHandQuantity: quantityHand,
         updatedBy,
       };
-      const response = await api.OnHand(payload, ingredientPrepForecastId);
+      const response = await api.OnHand(payload, ingredientId);
       triggerRefresh();
 
       return response;
@@ -1618,13 +1618,13 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
     }
   };
 
-  const OnExpiredApi = async (ingredientPrepForecastId: string) => {
+  const OnExpiredApi = async (ingredientId: string) => {
     try {
       const payload = {
         expiredQuantity: quantityExpired,
         updatedBy,
       };
-      const response = await api.OnExpired(payload, ingredientPrepForecastId);
+      const response = await api.OnExpired(payload, ingredientId);
       triggerRefresh();
 
       return response;
@@ -1641,7 +1641,7 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
 
   const DeleteExpiredApi = async () => {
     try {
-      const response = await api.DeleteExpired(ingredientPrepForecastId);
+      const response = await api.DeleteExpired(ingredientId);
       return response;
     } catch (error) {
       console.error("Error updating preparation status:", error);
@@ -1909,7 +1909,7 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
                       }
                       title="Update the On-Hand Quantity"
                       description="Please update the on-hand quantity for this item"
-                      onConfirm={() => OnHandAPi(ingredientPrepForecastId)}
+                      onConfirm={() => OnHandAPi(ingredientId)}
                       onCancel={() => console.log("Cancelled")}
                     >
                       <Input
@@ -1947,7 +1947,7 @@ const PrepItemCard: React.FC<PrepItemCardProps> = ({
                         }
                         title="Update the Expired Quantity"
                         description="Please update the expired quantity for this item"
-                        onConfirm={() => OnExpiredApi(ingredientPrepForecastId)}
+                        onConfirm={() => OnExpiredApi(ingredientId)}
                         onCancel={() => console.log("Cancelled")}
                       >
                         <Input

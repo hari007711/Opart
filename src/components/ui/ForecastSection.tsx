@@ -9,6 +9,7 @@ interface ForecastItemDisplay {
   unit?: string;
   image?: StaticImageData | string;
   posItemId?: string;
+  imageUrl?: string;
 }
 
 interface DayPart {
@@ -48,6 +49,7 @@ export default function ForecastSection({
                     quantity={item.forecastedQuantity}
                     itemId={item.posItemId}
                     day={day.dayPart}
+                    imageUrl={item.imageUrl}
                   />
                 </div>
               ))}

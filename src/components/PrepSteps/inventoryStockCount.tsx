@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -8,124 +8,203 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "../ui/Button";
-import { useDayCountStore, useStatusStore } from "@/store/forecastStore";
+import {
+  useDayCountStore,
+  useInventoryStore,
+  useStatusStore,
+  useLocationStore,
+} from "@/store/forecastStore";
 import { CommonDialog } from "../Dialog/CommonDialog";
 import { Input } from "../ui/input";
 import { api } from "@/lib/api";
 
+interface QuantityData {
+  boxes: number;
+  bags: number;
+  each: number;
+}
+
+interface InventoryItem {
+  ingredientId: string;
+  itemName: string;
+  startOfDayQuantity: QuantityData;
+  endOfDayQuantity: QuantityData;
+  remainingQuantity: QuantityData;
+  consumptionRate: QuantityData;
+  consumptionStatus: "normal" | "increase" | "decrease";
+  category?: string;
+}
+
+interface InvDataResponse {
+  items: InventoryItem[];
+  totalItems?: number;
+  location?: string;
+}
+
 export default function InventoryStockCount() {
   const { dayCount } = useDayCountStore();
   const { status } = useStatusStore();
-  const [data, setData] = useState(
-    Array(8)
-      .fill(null)
-      .map(() => ({
-        itemName: "Item Name",
-        startBoxes: 10,
-        startBags: 10,
-        endBoxes: 10,
-        endBags: 10,
-        remainingBoxes: 10,
-        remainingBags: 10,
-        each: 10,
-        consumption: { boxes: 10, bags: 10, type: "increase" },
-      }))
-  );
-
-  const [InvData, setInvData] = useState();
-
-  const fetchData = async () => {
-    try {
-      const res = await api.InventoryCnt();
-
-      // API returns { items: [...], totalItems, location }
-      setInvData(res);
-    } catch (err) {
-      console.error("Failed to fetch inventory data:", err);
-    } finally {
-      // setLoading(false);
-    }
-  };
+  const { addPendingUpdate } = useInventoryStore();
+  const { selectedLocation } = useLocationStore();
+  const [data, setData] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [currentRow, setCurrentRow] = useState<number | null>(null);
   const [currentField, setCurrentField] = useState<
-    "remainingBoxes" | "remainingBags" | "each" | null
+    "boxes" | "bags" | "each" | null
   >(null);
   const [quantityHand, setQuantityHand] = useState<number>(0);
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      console.log("=== FETCH DATA START ===");
+      console.log("dayCount value:", dayCount);
+      console.log("dayCount type:", typeof dayCount);
+      console.log("Is Daily Count?", dayCount === "Daily Count");
+      console.log("Is Weekly Count?", dayCount === "Weekly Count");
+
+      if (dayCount === "Daily Count") {
+        console.log("✓ Condition met: Calling Daily Count API");
+        const res: InvDataResponse = await api.InventoryCnt();
+        setData(res.items || []);
+      } else if (dayCount === "Weekly Count") {
+        // Weekly Count
+        console.log("✓ Condition met: Calling Weekly Count API");
+        // const today = new Date();
+        // const startDate = new Date(today);
+        // startDate.setDate(today.getDate() - 7);
+        // const endDate = today;
+
+        const startDate = "2025-08-06";
+        const endDate = "2025-08-10";
+
+        const formatDate = (date: Date) => {
+          return date.toISOString().split("T")[0];
+        };
+
+        // const formattedStartDate = formatDate(startDate);
+        // const formattedEndDate = formatDate(endDate);
+
+        const formattedStartDate = startDate;
+        const formattedEndDate = endDate;
+
+        console.log("Date range:", formattedStartDate, "to", formattedEndDate);
+        console.log("Location filter value:", selectedLocation);
+        console.log("Location filter type:", typeof selectedLocation);
+        console.log("Location is empty?", selectedLocation === "");
+        console.log("Calling API with params:", {
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          storageLocation: selectedLocation || undefined,
+        });
+
+        const res: InvDataResponse = await api.WeeklyInventoryCnt(
+          formattedStartDate,
+          formattedEndDate,
+          selectedLocation || undefined
+        );
+        console.log("Weekly API response:", res);
+        setData(res.items || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch inventory data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log(
+      "useEffect triggered - dayCount:",
+      dayCount,
+      "selectedLocation:",
+      selectedLocation
+    );
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayCount, selectedLocation]);
+
+  const [updatedBy, setUpdatedBy] = useState("");
+
+  useEffect(() => {
+    const name = localStorage.getItem("userName");
+    setUpdatedBy(name!);
+  }, []);
+
   const handleEdit = (
-    rowIndex: number,
-    field: "remainingBoxes" | "remainingBags" | "each"
+    ingredientId: string,
+    field: "boxes" | "bags" | "each",
+    currentValue: number
   ) => {
+    const rowIndex = data.findIndex(
+      (item) => item.ingredientId === ingredientId
+    );
     setCurrentRow(rowIndex);
     setCurrentField(field);
-    setQuantityHand(data[rowIndex][field]);
+    setQuantityHand(currentValue);
   };
 
-  const offCycleData = Array(4).fill({
-    itemName: "Item Name",
-    startBoxes: 10,
-    startBags: 10,
-    endBoxes: 10,
-    endBags: 10,
-    remainingBoxes: 10,
-    remainingBags: 10,
-    each: 10,
-    consumption: { boxes: 10, bags: 10, type: "increase" },
-  });
+  console.log(updatedBy, "updatedBy");
 
-  const batchData = Array(4).fill({
-    itemName: "Item Name",
-    startBoxes: 10,
-    startBags: 10,
-    endBoxes: 10,
-    endBags: 10,
-    remainingBoxes: 10,
-    remainingBags: 10,
-    each: 10,
-    consumption: { boxes: 10, bags: 10, type: "increase" },
-  });
+  const handleConfirmUpdate = () => {
+    if (currentRow !== null && currentField) {
+      const ingredientId = data[currentRow].ingredientId;
+      const updatedData = data.map((row, index) => {
+        if (index === currentRow) {
+          const newRemainingQuantity = {
+            ...row.remainingQuantity,
+            [currentField]: quantityHand,
+          };
+          addPendingUpdate(ingredientId, newRemainingQuantity, updatedBy);
 
-  const dayData = Array(4).fill({
-    itemName: "Item Name",
-    startBoxes: 10,
-    startBags: 10,
-    endBoxes: 10,
-    endBags: 10,
-    remainingBoxes: 10,
-    remainingBags: 10,
-    each: 10,
-    consumption: { boxes: 10, bags: 10, type: "increase" },
-  });
+          return {
+            ...row,
+            remainingQuantity: newRemainingQuantity,
+          };
+        }
+        return row;
+      });
 
-  const nonFoodData = Array(4).fill({
-    itemName: "Item Name",
-    startBoxes: 10,
-    startBags: 10,
-    endBoxes: 10,
-    endBags: 10,
-    remainingBoxes: 10,
-    remainingBags: 10,
-    each: 10,
-    consumption: { boxes: 10, bags: 10, type: "increase" },
-  });
+      setData(updatedData);
 
-  const updateValue = (
-    rowIndex: number,
-    field: "remainingBoxes" | "remainingBags" | "each",
-    delta: number
-  ) => {
-    setData((prev) =>
-      prev.map((row, i) =>
-        i === rowIndex
-          ? {
-              ...row,
-              [field]: Math.max(0, row[field] + delta),
-            }
-          : row
-      )
+      setCurrentRow(null);
+      setCurrentField(null);
+    }
+  };
+
+  const getConsumptionColor = (status: string) => {
+    switch (status) {
+      case "increase":
+        return "bg-yellow-500";
+      case "decrease":
+        return "bg-red-600";
+      default:
+        return "bg-gray-400";
+    }
+  };
+
+  const getConsumptionSymbol = (status: string) => {
+    return status === "increase" ? "+" : "-";
+  };
+
+  if (loading) {
+    return (
+      <div className="p-2 flex items-center justify-center h-full">
+        <p className="text-gray-600">Loading inventory data...</p>
+      </div>
     );
-  };
+  }
+
+  // Filter data by category for weekly count
+  const offCycleData = data.filter(
+    (item) => item.category === "Off-cycle Fry Prep Items"
+  );
+  const batchData = data.filter((item) => item.category === "Batch Prep Items");
+  const dayData = data.filter((item) => item.category === "24-hours Items");
+  const nonFoodData = data.filter((item) => item.category === "Non-Food Items");
+
+  console.log(data, "data");
 
   return (
     <div className="p-2 bg-[#edeff7]">
@@ -134,7 +213,6 @@ export default function InventoryStockCount() {
           <div className="p-2 bg-[#dadee9] rounded">
             <h1 className="font-semibold text-lg">Daily Items</h1>
           </div>
-
           <div className="my-5">
             <Table>
               <TableHeader>
@@ -159,7 +237,7 @@ export default function InventoryStockCount() {
               <TableBody className="border-1 border-gray-500 bg-white">
                 {data.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="flex items-center gap-2 whitespace-normal">
                       <div className="h-8 w-8 bg-gray-200 rounded flex items-center justify-center">
                         <span className="text-xs">🖼️</span>
                       </div>
@@ -167,28 +245,15 @@ export default function InventoryStockCount() {
                     </TableCell>
 
                     <TableCell>
-                      {row.startBoxes} Boxes ・ {row.startBags} Bags
+                      {row.startOfDayQuantity.boxes} Boxes ・{" "}
+                      {row.startOfDayQuantity.bags} Bags
                     </TableCell>
 
-                    <TableCell>{row.endBags} Bags</TableCell>
+                    <TableCell>{row.endOfDayQuantity.bags} Bags</TableCell>
 
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
-                          {status !== "confirm" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                updateValue(i, "remainingBoxes", -1)
-                              }
-                            >
-                              -
-                            </Button>
-                          )}
-                          <span className="px-2 h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.remainingBoxes} boxes
-                          </span>
                           {status !== "confirm" && (
                             <CommonDialog
                               trigger={
@@ -196,9 +261,52 @@ export default function InventoryStockCount() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() =>
-                                      handleEdit(i, "remainingBoxes")
-                                    }
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
+                          )}
+
+                          <span className="px-2 h-7.5  flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.boxes} boxes
+                          </span>
+
+                          {status !== "confirm" && (
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
                                   >
                                     +
                                   </Button>
@@ -206,20 +314,7 @@ export default function InventoryStockCount() {
                               }
                               title="Update the Box Quantity"
                               description="Please add remaining quantity of boxes of the item"
-                              onConfirm={() => {
-                                if (currentRow !== null && currentField) {
-                                  setData((prev) =>
-                                    prev.map((row, index) =>
-                                      index === currentRow
-                                        ? {
-                                            ...row,
-                                            [currentField]: quantityHand,
-                                          }
-                                        : row
-                                    )
-                                  );
-                                }
-                              }}
+                              onConfirm={handleConfirmUpdate}
                               onCancel={() => console.log("Cancelled")}
                             >
                               <Input
@@ -238,18 +333,41 @@ export default function InventoryStockCount() {
 
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                updateValue(i, "remainingBags", -1)
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
                               }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
                             >
-                              -
-                            </Button>
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.remainingBags} bags
+                          <span className="px-2 h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.bags} bags
                           </span>
                           {status !== "confirm" && (
                             <CommonDialog
@@ -258,9 +376,13 @@ export default function InventoryStockCount() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() =>
-                                      handleEdit(i, "remainingBags")
-                                    }
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
                                   >
                                     +
                                   </Button>
@@ -268,20 +390,7 @@ export default function InventoryStockCount() {
                               }
                               title="Update Bag Quantity"
                               description="Please add remaining quantity of bags of the item"
-                              onConfirm={() => {
-                                if (currentRow !== null && currentField) {
-                                  setData((prev) =>
-                                    prev.map((row, index) =>
-                                      index === currentRow
-                                        ? {
-                                            ...row,
-                                            [currentField]: quantityHand,
-                                          }
-                                        : row
-                                    )
-                                  );
-                                }
-                              }}
+                              onConfirm={handleConfirmUpdate}
                               onCancel={() => console.log("Cancelled")}
                             >
                               <Input
@@ -300,16 +409,41 @@ export default function InventoryStockCount() {
 
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateValue(i, "each", -1)}
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
                             >
-                              -
-                            </Button>
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.each} each
+                          <span className="px-2 h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.each} each
                           </span>
                           {status !== "confirm" && (
                             <CommonDialog
@@ -318,7 +452,13 @@ export default function InventoryStockCount() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleEdit(i, "each")}
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
                                   >
                                     +
                                   </Button>
@@ -326,20 +466,7 @@ export default function InventoryStockCount() {
                               }
                               title="Update Individual Quantity"
                               description="Please add remaining quantity of individual units of the item"
-                              onConfirm={() => {
-                                if (currentRow !== null && currentField) {
-                                  setData((prev) =>
-                                    prev.map((row, index) =>
-                                      index === currentRow
-                                        ? {
-                                            ...row,
-                                            [currentField]: quantityHand,
-                                          }
-                                        : row
-                                    )
-                                  );
-                                }
-                              }}
+                              onConfirm={handleConfirmUpdate}
                               onCancel={() => console.log("Cancelled")}
                             >
                               <Input
@@ -359,18 +486,14 @@ export default function InventoryStockCount() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${
-                            row.consumption.type === "increase"
-                              ? "bg-yellow-500"
-                              : row.consumption.type === "decrease"
-                              ? "bg-red-600"
-                              : "bg-gray-400"
-                          }`}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${getConsumptionColor(
+                            row.consumptionStatus
+                          )}`}
                         >
-                          {row.consumption.type === "increase" ? "+" : "-"}
+                          {getConsumptionSymbol(row.consumptionStatus)}
                         </div>
-                        {row.consumption.boxes} Boxes ・ {row.consumption.bags}{" "}
-                        Bags
+                        {row.consumptionRate.boxes} Boxes ・{" "}
+                        {row.consumptionRate.bags} Bags
                       </div>
                     </TableCell>
                   </TableRow>
@@ -409,63 +532,238 @@ export default function InventoryStockCount() {
               <TableBody className="border-1 border-gray-500 bg-white">
                 {offCycleData.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="flex items-center gap-2 whitespace-normal">
                       <div className="h-8 w-8 bg-gray-200 rounded flex items-center justify-center">
                         <span className="text-xs">🖼️</span>
                       </div>
                       {row.itemName}
                     </TableCell>
                     <TableCell>
-                      {row.startBoxes} Boxes ・ {row.startBags} Bags
+                      {row.startOfDayQuantity.boxes} Boxes ・{" "}
+                      {row.startOfDayQuantity.bags} Bags
                     </TableCell>
-                    <TableCell>{row.endBags} Bags</TableCell>
+                    <TableCell>{row.endOfDayQuantity.bags} Bags</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 h-7.5 flex items-center border rounded bg-gray-100 text-sm">
-                            {row.remainingBoxes} boxes
+                          <span className="px-2 h-7.5 flex items-center justify-center w-22 border rounded bg-gray-100 text-sm">
+                            {row.remainingQuantity.boxes} boxes
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.remainingBags} bags
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.bags} bags
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.each} each
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.each} each
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                       </div>
@@ -473,18 +771,14 @@ export default function InventoryStockCount() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${
-                            row.consumption.type === "increase"
-                              ? "bg-yellow-500"
-                              : row.consumption.type === "decrease"
-                              ? "bg-red-600"
-                              : "bg-gray-400"
-                          }`}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${getConsumptionColor(
+                            row.consumptionStatus
+                          )}`}
                         >
-                          {row.consumption.type === "increase" ? "+" : "-"}
+                          {getConsumptionSymbol(row.consumptionStatus)}
                         </div>
-                        {row.consumption.boxes} Boxes ・ {row.consumption.bags}{" "}
-                        Bags
+                        {row.consumptionRate.boxes} Boxes ・{" "}
+                        {row.consumptionRate.bags} Bags
                       </div>
                     </TableCell>
                   </TableRow>
@@ -520,63 +814,238 @@ export default function InventoryStockCount() {
               <TableBody className="border-1 border-gray-500 bg-white">
                 {batchData.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="flex items-center gap-2 whitespace-normal">
                       <div className="h-8 w-8 bg-gray-200 rounded flex items-center justify-center">
                         <span className="text-xs">🖼️</span>
                       </div>
                       {row.itemName}
                     </TableCell>
                     <TableCell>
-                      {row.startBoxes} Boxes ・ {row.startBags} Bags
+                      {row.startOfDayQuantity.boxes} Boxes ・{" "}
+                      {row.startOfDayQuantity.bags} Bags
                     </TableCell>
-                    <TableCell>{row.endBags} Bags</TableCell>
+                    <TableCell>{row.endOfDayQuantity.bags} Bags</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 h-7.5 flex items-center border rounded bg-gray-100 text-sm">
-                            {row.remainingBoxes} boxes
+                          <span className="px-2 h-7.5 flex items-center justify-center w-22 border rounded bg-gray-100 text-sm">
+                            {row.remainingQuantity.boxes} boxes
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.remainingBags} bags
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.bags} bags
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.each} each
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.each} each
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                       </div>
@@ -584,18 +1053,14 @@ export default function InventoryStockCount() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${
-                            row.consumption.type === "increase"
-                              ? "bg-yellow-500"
-                              : row.consumption.type === "decrease"
-                              ? "bg-red-600"
-                              : "bg-gray-400"
-                          }`}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${getConsumptionColor(
+                            row.consumptionStatus
+                          )}`}
                         >
-                          {row.consumption.type === "increase" ? "+" : "-"}
+                          {getConsumptionSymbol(row.consumptionStatus)}
                         </div>
-                        {row.consumption.boxes} Boxes ・ {row.consumption.bags}{" "}
-                        Bags
+                        {row.consumptionRate.boxes} Boxes ・{" "}
+                        {row.consumptionRate.bags} Bags
                       </div>
                     </TableCell>
                   </TableRow>
@@ -631,63 +1096,238 @@ export default function InventoryStockCount() {
               <TableBody className="border-1 border-gray-500 bg-white">
                 {dayData.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="flex items-center gap-2 whitespace-normal">
                       <div className="h-8 w-8 bg-gray-200 rounded flex items-center justify-center">
                         <span className="text-xs">🖼️</span>
                       </div>
                       {row.itemName}
                     </TableCell>
                     <TableCell>
-                      {row.startBoxes} Boxes ・ {row.startBags} Bags
+                      {row.startOfDayQuantity.boxes} Boxes ・{" "}
+                      {row.startOfDayQuantity.bags} Bags
                     </TableCell>
-                    <TableCell>{row.endBags} Bags</TableCell>
+                    <TableCell>{row.endOfDayQuantity.bags} Bags</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 h-7.5 flex items-center border rounded bg-gray-100 text-sm">
-                            {row.remainingBoxes} boxes
+                          <span className="px-2 h-7.5 flex items-center justify-center w-22 border rounded bg-gray-100 text-sm">
+                            {row.remainingQuantity.boxes} boxes
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.remainingBags} bags
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.bags} bags
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.each} each
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.each} each
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                       </div>
@@ -695,18 +1335,14 @@ export default function InventoryStockCount() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${
-                            row.consumption.type === "increase"
-                              ? "bg-yellow-500"
-                              : row.consumption.type === "decrease"
-                              ? "bg-red-600"
-                              : "bg-gray-400"
-                          }`}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${getConsumptionColor(
+                            row.consumptionStatus
+                          )}`}
                         >
-                          {row.consumption.type === "increase" ? "+" : "-"}
+                          {getConsumptionSymbol(row.consumptionStatus)}
                         </div>
-                        {row.consumption.boxes} Boxes ・ {row.consumption.bags}{" "}
-                        Bags
+                        {row.consumptionRate.boxes} Boxes ・{" "}
+                        {row.consumptionRate.bags} Bags
                       </div>
                     </TableCell>
                   </TableRow>
@@ -742,63 +1378,238 @@ export default function InventoryStockCount() {
               <TableBody className="border-1 border-gray-500 bg-white">
                 {nonFoodData.map((row, i) => (
                   <TableRow key={i}>
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="flex items-center gap-2 whitespace-normal">
                       <div className="h-8 w-8 bg-gray-200 rounded flex items-center justify-center">
                         <span className="text-xs">🖼️</span>
                       </div>
                       {row.itemName}
                     </TableCell>
                     <TableCell>
-                      {row.startBoxes} Boxes ・ {row.startBags} Bags
+                      {row.startOfDayQuantity.boxes} Boxes ・{" "}
+                      {row.startOfDayQuantity.bags} Bags
                     </TableCell>
-                    <TableCell>{row.endBags} Bags</TableCell>
+                    <TableCell>{row.endOfDayQuantity.bags} Bags</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 h-7.5 flex items-center border rounded bg-gray-100 text-sm">
-                            {row.remainingBoxes} boxes
+                          <span className="px-2 h-7.5 flex items-center justify-center w-22 border rounded bg-gray-100 text-sm">
+                            {row.remainingQuantity.boxes} boxes
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "boxes",
+                                        row.remainingQuantity.boxes
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update the Box Quantity"
+                              description="Please add remaining quantity of boxes of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.remainingBags} bags
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.bags} bags
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "bags",
+                                        row.remainingQuantity.bags
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Bag Quantity"
+                              description="Please add remaining quantity of bags of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                         <span>・</span>
                         <div className="flex items-center gap-1">
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              -
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    -
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
-                          <span className="px-2 border h-7.5 flex items-center border rounded-md bg-gray-100 text-sm">
-                            {row.each} each
+                          <span className="px-2 border h-7.5 flex items-center justify-center w-22 border rounded-md bg-gray-100 text-sm">
+                            {row.remainingQuantity.each} each
                           </span>
                           {status !== "confirm" && (
-                            <Button variant="outline" size="sm">
-                              +
-                            </Button>
+                            <CommonDialog
+                              trigger={
+                                <div className="flex bg-gray-200 rounded cursor-pointer hover:bg-gray-300">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleEdit(
+                                        row.ingredientId,
+                                        "each",
+                                        row.remainingQuantity.each
+                                      );
+                                    }}
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              }
+                              title="Update Individual Quantity"
+                              description="Please add remaining quantity of individual units of the item"
+                              onConfirm={handleConfirmUpdate}
+                              onCancel={() => console.log("Cancelled")}
+                            >
+                              <Input
+                                type="number"
+                                value={quantityHand}
+                                onChange={(e) =>
+                                  setQuantityHand(Number(e.target.value))
+                                }
+                                className="text-center text-xl border border-gray-500 h-12 font-semibold"
+                              />
+                            </CommonDialog>
                           )}
                         </div>
                       </div>
@@ -806,18 +1617,14 @@ export default function InventoryStockCount() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${
-                            row.consumption.type === "increase"
-                              ? "bg-yellow-500"
-                              : row.consumption.type === "decrease"
-                              ? "bg-red-600"
-                              : "bg-gray-400"
-                          }`}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-white text-sm ${getConsumptionColor(
+                            row.consumptionStatus
+                          )}`}
                         >
-                          {row.consumption.type === "increase" ? "+" : "-"}
+                          {getConsumptionSymbol(row.consumptionStatus)}
                         </div>
-                        {row.consumption.boxes} Boxes ・ {row.consumption.bags}{" "}
-                        Bags
+                        {row.consumptionRate.boxes} Boxes ・{" "}
+                        {row.consumptionRate.bags} Bags
                       </div>
                     </TableCell>
                   </TableRow>
